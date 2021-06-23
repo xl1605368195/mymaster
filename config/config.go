@@ -1,7 +1,8 @@
-package main
+package config
 
 import (
 	"github.com/spf13/viper"
+	"jrasp-master/frame/logger"
 )
 
 // jrasp-master配置文件
@@ -14,7 +15,7 @@ type EtcdConfig struct {
 	Endpoints []string `json:"endpoints"`
 }
 
-func (m *Master) InitConfig() error {
+func InitConfig(logger *logger.Writer) (*MasterConfig, error) {
 	// 查找配置文件
 	vp := viper.New()
 	vp.SetConfigName("config")
@@ -24,19 +25,19 @@ func (m *Master) InitConfig() error {
 	// 设置默认配置
 	vp.SetDefault("env", "dev")
 	vp.SetDefault("etcdConfig.endpoints", []string{"localhost:2379"})
+	// TODO 新增配置的默认值在这里加
+
 
 	err := vp.ReadInConfig()
 	if err != nil {
-		m.logger.Warning(LOGGER_INIT_ERROR, "read config failed, use default config,err:%+v", err)
+		logger.Warning(1000, "read config failed, use default config,err:%+v", err)
 	}
 
 	// 配置输出
 	var configjson MasterConfig
 	if err := vp.Unmarshal(&configjson); err != nil {
-		m.logger.Err(LOGGER_INIT_ERROR, "vp.Unmarshal failed,err:%+v", err)
-		return err
+		logger.Err(2000, "vp.Unmarshal failed,err:%+v", err)
+		return nil, err
 	}
-
-	m.config = configjson
-	return nil
+	return &configjson, nil
 }

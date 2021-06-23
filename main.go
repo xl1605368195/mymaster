@@ -1,22 +1,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/pborman/getopt"
 	"go.etcd.io/etcd/clientv3"
+	"jrasp-master/config"
+	"jrasp-master/constants"
+	"jrasp-master/frame/logger"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Master struct {
 	AppName    string
-	config     MasterConfig
-	logger     *Writer
+	config     config.MasterConfig
+	logger     *logger.Writer
 	HostName   string
 	RunDir     string
 	SelfPid    int
 	Watchkey   string
 	EtcdClient *clientv3.Client
+	ctx        context.Context //
 }
 
 func NewMaster() *Master {
@@ -59,10 +65,12 @@ func main() {
 
 	// 日志初始化
 	m.RunDir = dir
-	m.logger = NewLog(dir, m.HostName, m.AppName, isProd, logOutputStd)
+	log := logger.NewLog(dir, m.HostName, m.AppName, isProd, logOutputStd)
+
 
 	// master配置初始化
-	if err := m.InitConfig(); err != nil {
+	conf, err := config.InitConfig(log)
+	if err != nil {
 		return
 	}
 
@@ -72,8 +80,29 @@ func main() {
 	}
 
 	//watch 的 key
-	watchKey := fmt.Sprintf(JRASP_MASTER_WATCH_KEY, m.HostName, m.SelfPid)
-	m.logger.Info(ETCD_INFO, "Current master watchKey=%s", watchKey)
+	watchKey := fmt.Sprintf(constants.JRASP_MASTER_WATCH_KEY, m.HostName, m.SelfPid)
+	m.logger.Info(constants.ETCD_INFO, "Current master watchKey=%s", watchKey)
 
-	select {} //todo block
+	go m.CheckEtcdOnline()
+
+}
+
+func (m *Master) CheckEtcdOnline() {
+	checkTicker := time.NewTicker(time.Minute * 10)
+	for {
+		select {
+		case _, ok := <-checkTicker.C:
+			if !ok {
+				return
+			}
+			m.checkOnline()
+		case <-m.ctx.Done():
+			m.logger.Debug(constants.ETCD_DEBUG, "CheckEtcdOnline goroutine Done")
+			return
+		}
+	}
+}
+
+func (m *Master) checkOnline() {
+
 }
